@@ -1,0 +1,47 @@
+name: Generate Daily Digest — החדשות של אמה
+
+on:
+  schedule:
+    # 04:00 UTC = 06:00 Israel Standard Time (IST)
+    # In summer (daylight saving), Israel is UTC+3, so this runs at 07:00 ✓
+    # In winter, Israel is UTC+2, so adjust to 05:00 UTC if needed
+    - cron: '0 4 * * *'
+
+  # Allow manual trigger from GitHub UI (useful for testing)
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to push the generated HTML to the repo
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Generate digest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CALLMEBOT_PHONE:   ${{ secrets.CALLMEBOT_PHONE }}
+          CALLMEBOT_APIKEY:  ${{ secrets.CALLMEBOT_APIKEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PAGES_BASE_URL:    ${{ secrets.PAGES_BASE_URL }}
+        run: python scripts/generate_digest.py
+
+      - name: Commit and push generated page
+        run: |
+          git config user.name  "Ema News Bot"
+          git config user.email "bot@ema-news"
+          git add docs/
+          git diff --staged --quiet || git commit -m "📰 Daily digest $(date +'%Y-%m-%d')"
+          git push
